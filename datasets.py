@@ -101,6 +101,7 @@ class LatentDataset(Dataset):
         super(LatentDataset, self).__init__()
         self.vae = vae 
         self.scale_factor = scale_factor
+        self.index_dir = os.path.dirname(index_path)  # Get the directory of the index file
 
         with open(index_path, 'r') as f:
             self.index = json.load(f)
@@ -114,6 +115,8 @@ class LatentDataset(Dataset):
             path = random.choice(paths)
         else:
             path = paths
+        # Make path relative to index file location
+        path = os.path.join(self.index_dir, path)
         image = np.load(path, mmap_mode='r').copy()
         mean, std = np.split(image, 2, axis=0)
         mean = torch.from_numpy(mean)

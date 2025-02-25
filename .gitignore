@@ -3,3 +3,4 @@ results/
 dataset
 dataset/*
 test.ipynb
+wandb/
