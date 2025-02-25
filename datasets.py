@@ -116,7 +116,7 @@ class LatentDataset(Dataset):
         else:
             path = paths
         # Make path relative to index file location
-        path = os.path.join(self.index_dir, path)
+        # path = os.path.join(self.index_dir, path)
         image = np.load(path, mmap_mode='r').copy()
         mean, std = np.split(image, 2, axis=0)
         mean = torch.from_numpy(mean)

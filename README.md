@@ -46,7 +46,7 @@ DiT models, but it can be easily modified to support other types of conditioning
 one node:
 
 ```bash
-torchrun  --nproc_per_node=1 --master-port 29502 train.py --model DiT-XL/2 --data-path ../../datasets/latent-imagenet-256/data_index.json
+torchrun  --nproc_per_node=8 train.py --model DiT-XL/2 --data-path ../../datasets/latent-imagenet-256/data_index.json
 ```
 
 ### PyTorch Training Results

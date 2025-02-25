@@ -28,7 +28,7 @@ from models import DiT_models
 from diffusion import create_diffusion
 from diffusers.models import AutoencoderKL
 from tqdm import tqdm
-from torch.optim import AdamW
+from torch.optim import AdamW, SGD
 
 from muon import Muon
 from datasets import get_dataset
@@ -152,8 +152,10 @@ def main(args):
         
         opts = {'muon' : Muon(muon_parameters, lr=0.02, momentum=0.95, rank = rank, world_size=dist.get_world_size()),
                 'adam' : AdamW(adam_parameters, lr=1e-4, weight_decay=0)}
-    else:
+    elif args.optimizer == 'adam':
         opts = {'adam' : AdamW(model.parameters(), lr=1e-4, weight_decay=0)}
+    else:
+        opts = {'sgd' : SGD(model.parameters(), lr=1e-4, weight_decay=0)}
 
     # Setup data:
     dataset = get_dataset('imagenet', args.data_path, vae=vae)
@@ -239,7 +241,7 @@ if __name__ == "__main__":
     parser.add_argument("--global-batch-size", type=int, default=256)
     parser.add_argument("--global-seed", type=int, default=0)
     parser.add_argument("--vae", type=str, choices=["ema", "mse"], default="ema")  # Choice doesn't affect training
-    parser.add_argument("--optimizer", type=str, choices=['adam', 'muon'], default='adam')
+    parser.add_argument("--optimizer", type=str, choices=['adam', 'muon', 'sgd'], default='adam')
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument("--log-every", type=int, default=100)
     parser.add_argument("--ckpt-every", type=int, default=50_000)
