@@ -28,7 +28,9 @@ from models import DiT_models
 from diffusion import create_diffusion
 from diffusers.models import AutoencoderKL
 from tqdm import tqdm
+from torch.optim import AdamW
 
+from muon import Muon
 from datasets import get_dataset
 
 def init_wandb(config):
@@ -143,8 +145,15 @@ def main(args):
     diffusion = create_diffusion(timestep_respacing="")  # default: 1000 steps, linear noise schedule
     vae = AutoencoderKL.from_pretrained(f"stabilityai/sd-vae-ft-{args.vae}").to(device)
 
-    # Setup optimizer (we used default Adam betas=(0.9, 0.999) and a constant learning rate of 1e-4 in our paper):
-    opt = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=0)
+    # Setup optimizer
+    if args.optimizer == 'muon':
+        muon_parameters = [p for name, p in model.named_parameters() if "blocks" in name and p.ndim >= 2]
+        adam_parameters = [p for name, p in model.named_parameters() if "blocks" not in name or p.ndim < 2]
+        
+        opts = {'muon' : Muon(muon_parameters, lr=0.02, momentum=0.95, rank = rank, world_size=dist.get_world_size()),
+                'adam' : AdamW(adam_parameters, lr=1e-4, weight_decay=0)}
+    else:
+        opts = {'adam' : AdamW(model.parameters(), lr=1e-4, weight_decay=0)}
 
     # Setup data:
     dataset = get_dataset('imagenet', args.data_path, vae=vae)
@@ -183,9 +192,11 @@ def main(args):
             model_kwargs = dict(y=y)
             loss_dict = diffusion.training_losses(model, x, t, model_kwargs)
             loss = loss_dict["loss"].mean()
-            opt.zero_grad()
+            for opt in opts.values():
+                opt.zero_grad()
             loss.backward()
-            opt.step()
+            for opt in opts.values():
+                opt.step()
             update_ema(ema, model.module)
 
             # log 
@@ -197,13 +208,14 @@ def main(args):
             if rank == 0:
                 loader.set_description(f'Itr : {train_steps} - Loss : {loss :.4f}')
             # Save DiT checkpoint:
+            train_steps+=1
             if train_steps % args.ckpt_every == 0 and train_steps > 0:
                 if rank == 0:
                     checkpoint = {
                         "model": model.module.state_dict(),
                         "ema": ema.state_dict(),
-                        "opt": opt.state_dict(),
-                        "args": args
+                        "args": args,
+                        **{name: opt.state_dict() for name, opt in opts.items()}
                     }
                     checkpoint_path = f"{checkpoint_dir}/{train_steps:07d}.pt"
                     torch.save(checkpoint, checkpoint_path)
@@ -227,7 +239,7 @@ if __name__ == "__main__":
     parser.add_argument("--global-batch-size", type=int, default=256)
     parser.add_argument("--global-seed", type=int, default=0)
     parser.add_argument("--vae", type=str, choices=["ema", "mse"], default="ema")  # Choice doesn't affect training
-    parser.add_argument("--optimizer", type=str, choices=['adam', 'muon'], default="ema")  # Choice doesn't affect training
+    parser.add_argument("--optimizer", type=str, choices=['adam', 'muon'], default='adam')
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument("--log-every", type=int, default=100)
     parser.add_argument("--ckpt-every", type=int, default=50_000)
