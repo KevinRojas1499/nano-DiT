@@ -11,10 +11,10 @@ import distributed
 import json
 
 @click.command()
-@click.option('--path', type=str, default='/network/rit/lab/Yelab/kevin-back/kevin_rojas/datasets/ILSVRC/Data/CLS-LOC/train/')
-@click.option('--dest', type=str, default='/network/rit/lab/Yelab/kevin-back/kevin_rojas/datasets/latent-imagenet')
-@click.option('--size', type=int, default=512)
-@click.option('--batch_size', type=int, default=32)
+@click.option('--path', type=str, default='dataset/ILSVRC/Data/CLS-LOC/train/')
+@click.option('--dest', type=str, default='dataset/latent-imagenet')
+@click.option('--size', type=int, default=256)
+@click.option('--batch_size', type=int, default=16)
 @click.option('--num_workers', type=int, default=4)
 @click.option('--vae_opt', type=click.Choice(['ema', 'mse']), default='ema')
 def process(path, dest, size, batch_size, num_workers, vae_opt):
@@ -31,13 +31,13 @@ def process(path, dest, size, batch_size, num_workers, vae_opt):
     for batch in tqdm(dataloader):
         imgs, cond, idx = batch
         imgs = imgs.to(device)
-        flipped_imgs = imgs.copy()[...,::-1]
+        flipped_imgs = torch.flip(imgs, dims=[-1])
 
-        mean, std = vae._encode_batch_mean_std(imgs)
-        latents = torch.cat((mean, std), dim=1)
+        dist = vae.encode(imgs)['latent_dist']
+        latents = torch.cat((dist.mean, dist.std), dim=1)
 
-        mean, std = vae._encode_batch_mean_std(flipped_imgs)
-        flipped_latents = torch.cat((mean, std), dim=1)
+        dist_flipped = vae.encode(flipped_imgs)['latent_dist']
+        flipped_latents = torch.cat((dist_flipped.mean, dist_flipped.std), dim=1)
 
         for latent,flipped_latent, cond, i, in  zip(latents, flipped_latents, cond, idx):
             i_str = f'{i :08d}'
