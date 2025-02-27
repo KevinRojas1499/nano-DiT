@@ -37,7 +37,7 @@ def init_wandb(config):
     wandb.init(
     entity="dynamical-ml",
     project="nano-DiT",
-    name=f'{config.optimizer}',
+    name=f'{config.optimizer}-{config.lr}',
     config=config
 )
 
@@ -146,16 +146,17 @@ def main(args):
     vae = AutoencoderKL.from_pretrained(f"stabilityai/sd-vae-ft-{args.vae}").to(device)
 
     # Setup optimizer
+    lr = args.lr
     if args.optimizer == 'muon':
         muon_parameters = [p for name, p in model.named_parameters() if "blocks" in name and p.ndim >= 2]
         adam_parameters = [p for name, p in model.named_parameters() if "blocks" not in name or p.ndim < 2]
         
-        opts = {'muon' : Muon(muon_parameters, lr=0.02, momentum=0.95, rank = rank, world_size=dist.get_world_size()),
+        opts = {'muon' : Muon(muon_parameters, lr=lr, momentum=0.95, rank = rank, world_size=dist.get_world_size()),
                 'adam' : AdamW(adam_parameters, lr=1e-4, weight_decay=0)}
     elif args.optimizer == 'adam':
-        opts = {'adam' : AdamW(model.parameters(), lr=1e-4, weight_decay=0)}
+        opts = {'adam' : AdamW(model.parameters(), lr=lr, weight_decay=0)}
     else:
-        opts = {'sgd' : SGD(model.parameters(), lr=1e-4, weight_decay=0)}
+        opts = {'sgd' : SGD(model.parameters(), lr=lr, weight_decay=0)}
 
     # Setup data:
     dataset = get_dataset('imagenet', args.data_path, vae=vae)
@@ -242,6 +243,7 @@ if __name__ == "__main__":
     parser.add_argument("--global-seed", type=int, default=0)
     parser.add_argument("--vae", type=str, choices=["ema", "mse"], default="ema")  # Choice doesn't affect training
     parser.add_argument("--optimizer", type=str, choices=['adam', 'muon', 'sgd'], default='adam')
+    parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument("--log-every", type=int, default=100)
     parser.add_argument("--ckpt-every", type=int, default=50_000)
