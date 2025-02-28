@@ -4,3 +4,4 @@ timm
 diffusers
 accelerate
 click
+scipy
