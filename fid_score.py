@@ -176,9 +176,11 @@ def calculate_fid_given_paths(path, ref_path, res, batch_size=50, num_workers=4)
         m2 = fid_stats['mu']
         s2 = fid_stats['sigma']
     else:
+        ref_save_path =  os.path.join(path,'ref')
+        os.makedirs(ref_save_path, exist_ok=True)
         ref_dataset = get_dataset(ref_path, res)
         m2, s2 = compute_statistics(ref_dataset, model, batch_size,
-                                        dims, device, num_workers, os.path.join(path,'ref'))
+                                        dims, device, num_workers, ref_save_path)
     
     fid_val_tensor = torch.tensor([-1.], device=device)
     if not is_distributed or is_distributed and dist.get_rank() == 0:

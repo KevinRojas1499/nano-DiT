@@ -4,3 +4,6 @@ dataset
 dataset/*
 test.ipynb
 wandb/
+*.png
+*.npy
+*.pt
